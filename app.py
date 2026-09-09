@@ -87,11 +87,11 @@ else:
         else:
             st.info(f"📅 {date_str} の新規評価を入力しています。")
 
-        # 4つの評価基準
-        q1 = st.selectbox("1. 授業態度", options=, index=existing_eval["q1"] - 1, key="q1")
-        q2 = st.selectbox("2. 学習に必要ないものは見ていないか", options=, index=existing_eval["q2"] - 1, key="q2")
-        q3 = st.selectbox("3. 挨拶の大きさ", options=, index=existing_eval["q3"] - 1, key="q3")
-        q4 = st.selectbox("4. 2分前に準備ができているか", options=, index=existing_eval["q4"] - 1, key="q4")
+        # 4つの評価基準 (1〜5点の選択肢を配置)
+        q1 = st.selectbox("1. 授業態度", options=[1, 2, 3, 4, 5], index=existing_eval["q1"] - 1, key="q1")
+        q2 = st.selectbox("2. 学習に必要ないものは見ていないか", options=[1, 2, 3, 4, 5], index=existing_eval["q2"] - 1, key="q2")
+        q3 = st.selectbox("3. 挨拶の大きさ", options=[1, 2, 3, 4, 5], index=existing_eval["q3"] - 1, key="q3")
+        q4 = st.selectbox("4. 2分前に準備ができているか", options=[1, 2, 3, 4, 5], index=existing_eval["q4"] - 1, key="q4")
         
         if st.button("評価を保存・更新する"):
             new_data = {
@@ -218,4 +218,3 @@ else:
                     else:
                         if st.button("🗑️ アカウントを削除する"):
                             del st.session_state["users"][selected_user]
-                            st.session_state["evaluations"] = [ev for ev in st.session_state["evaluations"] if ev["user_id"] != selected_user]
