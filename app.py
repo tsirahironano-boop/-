@@ -46,7 +46,8 @@ else:
     current_user = st.session_state["logged_in_user"]
     current_role = st.session_state["user_role"]
     
-    col_header, col_logout = st.columns()
+    # 横に2分割するように数値を明記しました
+    col_header, col_logout = st.columns(2)
     with col_header:
         st.write(f"ログイン中: **{current_user}** さん（権限: {current_role}）")
     with col_logout:
@@ -139,7 +140,7 @@ else:
                     # 1件ずつ表示し、横に削除ボタンを配置
                     for ev in student_evals:
                         with st.container():
-                            col_txt, col_del = st.columns()
+                            col_txt, col_del = st.columns(2)
                             with col_txt:
                                 st.write(f"📅 **日付: {ev['date']}**")
                                 st.text(f" └ 授業態度: {ev['授業態度']} | 外部確認: {ev['学習に必要ないものは見ていないか']} | 挨拶: {ev['挨拶の大きさ']} | 準備: {ev['2分前に準備ができているか']}")
@@ -210,7 +211,7 @@ else:
                             else:
                                 st.session_state["users"][selected_user]["password"] = edit_pw
                                 st.success("パスワードを変更しました！")
-                                st.rerun()
+                                rerun()
                                 
                 with col_delete:
                     if selected_user == "admin" and current_user == "admin":
