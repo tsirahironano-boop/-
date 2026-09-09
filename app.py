@@ -1,35 +1,27 @@
 import streamlit as st
-from datetime import date
+from datetime import date, datetime
 
 # -----------------------------------------------------------------------------
-# 1. データの初期化（簡易データベースの作成）
-# Streamlitのセッション状態を利用してアプリ内でデータを保持します
+# 1. データの初期化（セッション状態で保持）
 # -----------------------------------------------------------------------------
 if "users" not in st.session_state:
-    # 初期ユーザー（教師アカウントを最低1つ用意）
     st.session_state["users"] = {
         "admin": {"password": "admin", "role": "教師"}
     }
 
 if "evaluations" not in st.session_state:
-    # 評価データ保存用辞書: { (ユーザーID, 日付): {項目1: 点数, ...} }
-    st.session_state["evaluations"] = {}
+    st.session_state["evaluations"] = []
 
-# -----------------------------------------------------------------------------
-# 2. ログイン状態の管理
-# -----------------------------------------------------------------------------
+# ログイン状態の管理
 if "logged_in_user" not in st.session_state:
     st.session_state["logged_in_user"] = None
 if "user_role" not in st.session_state:
     st.session_state["user_role"] = None
 
-# -----------------------------------------------------------------------------
-# 3. アプリ全体のタイトル
-# -----------------------------------------------------------------------------
-st.title("🏫 生徒評価管理アプリ")
+st.title("🏫 生徒評価管理アプリ (完全管理版)")
 
 # -----------------------------------------------------------------------------
-# 4. ログイン画面（未ログインの場合に表示）
+# 2. ログイン画面
 # -----------------------------------------------------------------------------
 if st.session_state["logged_in_user"] is None:
     st.subheader("ログイン")
@@ -38,24 +30,22 @@ if st.session_state["logged_in_user"] is None:
     login_pw = st.text_input("パスワード", type="password", key="login_pw")
     
     if st.button("ログイン"):
-        # ユーザーの存在とパスワードのチェック
         if login_id in st.session_state["users"] and st.session_state["users"][login_id]["password"] == login_pw:
             st.session_state["logged_in_user"] = login_id
             st.session_state["user_role"] = st.session_state["users"][login_id]["role"]
             st.success(f"{login_id} としてログインしました！")
-            st.rerun()  # 画面を更新
+            st.rerun()
         else:
             st.error("ユーザーIDまたはパスワードが正しくありません。")
-            st.info("※初回起動時は、教師ID: admin / パスワード: admin でログインできます。")
+            st.info("※初期ログイン用 ＞ ID: admin / パスワード: admin")
 
 # -----------------------------------------------------------------------------
-# 5. ログイン後のメイン画面
+# 3. ログイン後のメイン画面
 # -----------------------------------------------------------------------------
 else:
     current_user = st.session_state["logged_in_user"]
     current_role = st.session_state["user_role"]
     
-    # ログアウトボタンとヘッダー情報
     col_header, col_logout = st.columns([4, 1])
     with col_header:
         st.write(f"ログイン中: **{current_user}** さん（権限: {current_role}）")
@@ -71,97 +61,161 @@ else:
     # 【生徒側画面】
     # -------------------------------------------------------------------------
     if current_role == "生徒":
-        st.subheader("本日の自己評価入力")
-        today = date.today()
-        st.info(f"日付: {today.strftime('%Y年%m月%d日')} (本日中であれば何度でも変更可能です)")
+        st.subheader("📝 評価の入力・修正")
         
-        # すでに今日のデータがあればそれを初期値にする
-        existing_eval = st.session_state["evaluations"].get((current_user, today), {
-            "授業態度": 3,
-            "学習に必要ないものは見ていないか": 3,
-            "挨拶の大きさ": 3,
-            "2分前に準備ができているか": 3
-        })
+        # 過去データも含めて、いつでも日付を選んで入力・変更可能に
+        selected_date = st.date_input("評価を入力・修正する日付を選択してください", date.today())
+        date_str = selected_date.strftime("%Y-%m-%d")
         
-        # 4つの評価基準（1〜5の選択肢）
-        q1 = st.selectbox("1. 授業態度", options=[1, 2, 3, 4, 5], index=existing_eval["授業態度"] - 1)
-        q2 = st.selectbox("2. 学習に必要ないものは見ていないか", options=[1, 2, 3, 4, 5], index=existing_eval["学習に必要ないものは見ていないか"] - 1)
-        q3 = st.selectbox("3. 挨拶の大きさ", options=[1, 2, 3, 4, 5], index=existing_eval["挨拶の大きさ"] - 1)
-        q4 = st.selectbox("4. 2分前に準備ができているか", options=[1, 2, 3, 4, 5], index=existing_eval["2分前に準備ができているか"] - 1)
+        # すでにその日のデータがあるか探す
+        existing_index = None
+        existing_eval = {"q1": 3, "q2": 3, "q3": 3, "q4": 3}
         
-        if st.button("評価を保存する"):
-            # データを保存
-            st.session_state["evaluations"][(current_user, today)] = {
+        for i, ev in enumerate(st.session_state["evaluations"]):
+            if ev["user_id"] == current_user and ev["date"] == date_str:
+                existing_index = i
+                existing_eval = {
+                    "q1": ev["授業態度"],
+                    "q2": ev["学習に必要ないものは見ていないか"],
+                    "q3": ev["挨拶の大きさ"],
+                    "q4": ev["2分前に準備ができているか"]
+                }
+                break
+        
+        if existing_index is not None:
+            st.warning(f"⚠️ {date_str} の評価データはすでに登録されています。内容を書き換えて保存すると更新されます。")
+        else:
+            st.info(f"📅 {date_str} の新規評価を入力しています。")
+
+        # 4つの評価基準
+        q1 = st.selectbox("1. 授業態度", options=[1, 2, 3, 4, 5], index=existing_eval["q1"] - 1, key="q1")
+        q2 = st.selectbox("2. 学習に必要ないものは見ていないか", options=[1, 2, 3, 4, 5], index=existing_eval["q2"] - 1, key="q2")
+        q3 = st.selectbox("3. 挨拶の大きさ", options=[1, 2, 3, 4, 5], index=existing_eval["q3"] - 1, key="q3")
+        q4 = st.selectbox("4. 2分前に準備ができているか", options=[1, 2, 3, 4, 5], index=existing_eval["q4"] - 1, key="q4")
+        
+        if st.button("評価を保存・更新する"):
+            new_data = {
+                "user_id": current_user,
+                "date": date_str,
                 "授業態度": q1,
                 "学習に必要ないものは見ていないか": q2,
                 "挨拶の大きさ": q3,
                 "2分前に準備ができているか": q4
             }
-            st.success("本日の評価を保存しました！")
+            
+            if existing_index is not None:
+                # 既存データを上書き
+                st.session_state["evaluations"][existing_index] = new_data
+                st.success(f"{date_str} の評価を更新しました！")
+            else:
+                # 新規追加
+                st.session_state["evaluations"].append(new_data)
+                st.success(f"{date_str} の評価を新しく保存しました！")
+            st.rerun()
 
     # -------------------------------------------------------------------------
     # 【教師側画面】
     # -------------------------------------------------------------------------
     elif current_role == "教師":
-        # タブで「評価の確認」と「アカウント管理」を分ける
-        tab1, tab2 = st.tabs(["📊 生徒の評価を確認する", "👤 アカウント管理（追加・設定）"])
+        tab1, tab2, tab3 = st.tabs(["📊 生徒の評価確認・削除", "👤 アカウント作成", "⚙️ アカウントの変更・削除"])
         
-        # --- タブ1: 評価の確認 ---
+        # --- タブ1: 評価の確認と削除 ---
         with tab1:
-            st.subheader("生徒の評価履歴")
-            
-            # 生徒一覧を取得
+            st.subheader("生徒の評価履歴一覧")
             student_list = [uid for uid, info in st.session_state["users"].items() if info["role"] == "生徒"]
             
             if not student_list:
-                st.warning("現在、登録されている生徒アカウントがありません。右側の「アカウント管理」から追加してください。")
+                st.warning("登録されている生徒アカウントがありません。")
             else:
                 selected_student = st.selectbox("確認したい生徒を選択", options=student_list)
                 
-                # 選択された生徒の過去データを抽出
-                history_data = []
-                for (uid, eval_date), scores in st.session_state["evaluations"].items():
-                    if uid == selected_student:
-                        history_data.append({
-                            "日付": eval_date.strftime("%Y-%m-%d"),
-                            "授業態度": scores["授業態度"],
-                            "学習に必要ないものは見ていないか": scores["学習に必要ないものは見ていないか"],
-                            "挨拶の大きさ": scores["挨拶の大きさ"],
-                            "2分前に準備ができているか": scores["2分前に準備ができているか"]
-                        })
+                # 該当生徒のデータを抽出
+                student_evals = [ev for ev in st.session_state["evaluations"] if ev["user_id"] == selected_student]
                 
-                if history_data:
-                    # 日付順に並び替えてテーブル表示
-                    history_data.sort(key=lambda x: x["日付"], reverse=True)
-                    st.dataframe(history_data, use_container_width=True)
-                else:
-                    st.info(f"{selected_student} さんの評価データはまだ投稿されていません。")
+                if student_evals:
+                    # 日付の新しい順に並び替え
+                    student_evals.sort(key=lambda x: x["date"], reverse=True)
                     
-        # --- タブ2: アカウント管理 ---
+                    # 1件ずつ表形式風に表示し、横に削除ボタンを配置
+                    for ev in student_evals:
+                        with st.container():
+                            col_txt, col_del = st.columns([4, 1])
+                            with col_txt:
+                                st.write(f"📅 **日付: {ev['date']}**")
+                                st.text(f" └ 授業態度: {ev['授業態度']} | 外部確認: {ev['学習に必要ないものは見ていないか']} | 挨拶: {ev['挨拶の大きさ']} | 準備: {ev['2分前に準備ができているか']}")
+                            with col_del:
+                                # ユニークなキーを生成して削除ボタンを設置
+                                if st.button("❌ 評価を削除", key=f"del_ev_{ev['user_id']}_{ev['date']}"):
+                                    st.session_state["evaluations"].remove(ev)
+                                    st.success(f"{ev['date']} の評価データを削除しました。")
+                                    st.rerun()
+                            st.divider()
+                else:
+                    st.info(f"{selected_student} さんの評価データはまだありません。")
+                    
+        # --- タブ2: アカウントの新規作成 ---
         with tab2:
             st.subheader("新しいアカウントの追加")
-            st.caption("生徒や他の教師のアカウントを何個でも新規作成できます。")
-            
-            new_id = st.text_input("新規ユーザーID（英数字推奨）")
+            new_id = st.text_input("新規ユーザーID")
             new_pw = st.text_input("新規パスワード", type="password")
-            new_role = st.radio("権限（役割）", options=["生徒", "教師"])
+            new_role = st.radio("権限（役割）", options=["生徒", "教師"], key="new_role")
             
             if st.button("アカウントを作成する"):
                 if not new_id or not new_pw:
-                    st.error("IDとパスワードは必須です。")
+                    st.error("IDとパスワードを入力してください。")
                 elif new_id in st.session_state["users"]:
-                    st.error("このユーザーIDはすでに使われています。")
+                    st.error("このユーザーIDはすでに存在します。")
                 else:
-                    # アカウントを追加登録
-                    st.session_state["users"][new_id] = {
-                        "password": new_pw,
-                        "role": new_role
-                    }
-                    st.success(f"アカウント「{new_id}」（{new_role}）を新しく作成しました！")
+                    st.session_state["users"][new_id] = {"password": new_pw, "role": new_role}
+                    st.success(f"アカウント「{new_id}」（{new_role}）を作成しました！")
                     st.rerun()
             
-            st.divider()
-            st.subheader("現在の登録アカウント一覧")
-            # 確認用に登録されているアカウントをリスト表示
-            for uid, info in st.session_state["users"].items():
-                st.text(f"・ID: {uid} | パスワード: {info['password']} | 権限: {info['role']}")
+        # --- タブ3: アカウントの変更・削除 ---
+        with tab3:
+            st.subheader("登録済みアカウントの編集と削除")
+            st.caption("先生や生徒のID・パスワードの変更、アカウント自体の削除が可能です。")
+            
+            all_users = list(st.session_state["users"].keys())
+            selected_user = st.selectbox("編集・削除するアカウントを選択", options=all_users)
+            
+            if selected_user:
+                user_info = st.session_state["users"][selected_user]
+                st.write(f"現在の権限: **{user_info['role']}**")
+                
+                # 変更用フォーム
+                edit_id = st.text_input("IDを変更する場合に入力", value=selected_user)
+                edit_pw = st.text_input("パスワードを変更する場合に入力", value=user_info["password"])
+                
+                col_update, col_delete = st.columns(2)
+                
+                with col_update:
+                    if st.button("💾 変更を保存する"):
+                        if not edit_id or not edit_pw:
+                            st.error("IDとパスワードは空にできません。")
+                        else:
+                            # IDが変更された場合
+                            if edit_id != selected_user:
+                                if edit_id in st.session_state["users"]:
+                                    st.error("変更先のIDはすでに他のユーザーに使われています。")
+                                else:
+                                    # 古いデータを削除して新しいIDで保存
+                                    st.session_state["users"][edit_id] = {"password": edit_pw, "role": user_info["role"]}
+                                    del st.session_state["users"][selected_user]
+                                    
+                                    # 評価データの紐付けIDも一括で書き換え
+                                    for ev in st.session_state["evaluations"]:
+                                        if ev["user_id"] == selected_user:
+                                            ev["user_id"] = edit_id
+                                            
+                                    # ログイン中の本人がIDを変えた場合はログイン状態を更新
+                                    if current_user == selected_user:
+                                        st.session_state["logged_in_user"] = edit_id
+                                    st.success("ユーザーIDとパスワードを変更しました！")
+                                    st.rerun()
+                            else:
+                                # パスワードのみ変更の場合
+                                st.session_state["users"][selected_user]["password"] = edit_pw
+                                st.success("パスワードを変更しました！")
+                                st.rerun()
+                                
+                with col_delete:
