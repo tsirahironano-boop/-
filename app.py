@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import date, datetime
+from datetime import date
 
 # -----------------------------------------------------------------------------
 # 1. データの初期化（セッション状態で保持）
@@ -46,7 +46,7 @@ else:
     current_user = st.session_state["logged_in_user"]
     current_role = st.session_state["user_role"]
     
-    col_header, col_logout = st.columns([4, 1])
+    col_header, col_logout = st.columns()
     with col_header:
         st.write(f"ログイン中: **{current_user}** さん（権限: {current_role}）")
     with col_logout:
@@ -88,10 +88,10 @@ else:
             st.info(f"📅 {date_str} の新規評価を入力しています。")
 
         # 4つの評価基準
-        q1 = st.selectbox("1. 授業態度", options=[1, 2, 3, 4, 5], index=existing_eval["q1"] - 1, key="q1")
-        q2 = st.selectbox("2. 学習に必要ないものは見ていないか", options=[1, 2, 3, 4, 5], index=existing_eval["q2"] - 1, key="q2")
-        q3 = st.selectbox("3. 挨拶の大きさ", options=[1, 2, 3, 4, 5], index=existing_eval["q3"] - 1, key="q3")
-        q4 = st.selectbox("4. 2分前に準備ができているか", options=[1, 2, 3, 4, 5], index=existing_eval["q4"] - 1, key="q4")
+        q1 = st.selectbox("1. 授業態度", options=, index=existing_eval["q1"] - 1, key="q1")
+        q2 = st.selectbox("2. 学習に必要ないものは見ていないか", options=, index=existing_eval["q2"] - 1, key="q2")
+        q3 = st.selectbox("3. 挨拶の大きさ", options=, index=existing_eval["q3"] - 1, key="q3")
+        q4 = st.selectbox("4. 2分前に準備ができているか", options=, index=existing_eval["q4"] - 1, key="q4")
         
         if st.button("評価を保存・更新する"):
             new_data = {
@@ -136,15 +136,14 @@ else:
                     # 日付の新しい順に並び替え
                     student_evals.sort(key=lambda x: x["date"], reverse=True)
                     
-                    # 1件ずつ表形式風に表示し、横に削除ボタンを配置
+                    # 1件ずつ表示し、横に削除ボタンを配置
                     for ev in student_evals:
                         with st.container():
-                            col_txt, col_del = st.columns([4, 1])
+                            col_txt, col_del = st.columns()
                             with col_txt:
                                 st.write(f"📅 **日付: {ev['date']}**")
                                 st.text(f" └ 授業態度: {ev['授業態度']} | 外部確認: {ev['学習に必要ないものは見ていないか']} | 挨拶: {ev['挨拶の大きさ']} | 準備: {ev['2分前に準備ができているか']}")
                             with col_del:
-                                # ユニークなキーを生成して削除ボタンを設置
                                 if st.button("❌ 評価を削除", key=f"del_ev_{ev['user_id']}_{ev['date']}"):
                                     st.session_state["evaluations"].remove(ev)
                                     st.success(f"{ev['date']} の評価データを削除しました。")
@@ -193,29 +192,30 @@ else:
                         if not edit_id or not edit_pw:
                             st.error("IDとパスワードは空にできません。")
                         else:
-                            # IDが変更された場合
                             if edit_id != selected_user:
                                 if edit_id in st.session_state["users"]:
                                     st.error("変更先のIDはすでに他のユーザーに使われています。")
                                 else:
-                                    # 古いデータを削除して新しいIDで保存
                                     st.session_state["users"][edit_id] = {"password": edit_pw, "role": user_info["role"]}
                                     del st.session_state["users"][selected_user]
                                     
-                                    # 評価データの紐付けIDも一括で書き換え
                                     for ev in st.session_state["evaluations"]:
                                         if ev["user_id"] == selected_user:
                                             ev["user_id"] = edit_id
                                             
-                                    # ログイン中の本人がIDを変えた場合はログイン状態を更新
                                     if current_user == selected_user:
                                         st.session_state["logged_in_user"] = edit_id
                                     st.success("ユーザーIDとパスワードを変更しました！")
                                     st.rerun()
                             else:
-                                # パスワードのみ変更の場合
                                 st.session_state["users"][selected_user]["password"] = edit_pw
                                 st.success("パスワードを変更しました！")
                                 st.rerun()
                                 
                 with col_delete:
+                    if selected_user == "admin" and current_user == "admin":
+                        st.warning("⚠️ 初期管理者(admin)は削除できません。")
+                    else:
+                        if st.button("🗑️ アカウントを削除する"):
+                            del st.session_state["users"][selected_user]
+                            st.session_state["evaluations"] = [ev for ev in st.session_state["evaluations"] if ev["user_id"] != selected_user]
